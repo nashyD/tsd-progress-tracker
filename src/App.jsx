@@ -28,8 +28,29 @@ const C = {
 // Single shared row `tsd-launch` in the `progress` table. Every
 // check-off writes to Supabase; all connected clients receive the
 // update via postgres_changes subscription and re-render instantly.
+//
+// The `progress.tasks` JSONB column stores two concerns stacked
+// together so no schema migration is needed:
+//   - Task completion: { "w1-1": true, "w2-3": true, ... }
+//   - Task reassignments: { "__assignments__": { "w1-1": "Bishop", ... } }
+// The splitAssignments/mergeAssignments helpers keep them separate
+// in component state but stitch them back together on every write.
+const ASSIGNMENTS_KEY = "__assignments__";
+
+function splitAssignments(rawTasks) {
+  const tasks = { ...(rawTasks || {}) };
+  const assignments = tasks[ASSIGNMENTS_KEY] || {};
+  delete tasks[ASSIGNMENTS_KEY];
+  return { tasks, assignments };
+}
+
+function mergeAssignments(tasks, assignments) {
+  const hasAny = assignments && Object.keys(assignments).length > 0;
+  return hasAny ? { ...tasks, [ASSIGNMENTS_KEY]: assignments } : { ...tasks };
+}
+
 function useProgress() {
-  const [state, setState] = useState({ tasks: {}, milestones: {} });
+  const [state, setState] = useState({ tasks: {}, milestones: {}, assignments: {} });
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -50,7 +71,8 @@ function useProgress() {
           setStatus("error");
           return;
         }
-        setState({ tasks: data.tasks || {}, milestones: data.milestones || {} });
+        const { tasks, assignments } = splitAssignments(data.tasks);
+        setState({ tasks, milestones: data.milestones || {}, assignments });
         setStatus("ready");
       });
 
@@ -62,7 +84,8 @@ function useProgress() {
         (payload) => {
           if (!mounted) return;
           const row = payload.new;
-          setState({ tasks: row.tasks || {}, milestones: row.milestones || {} });
+          const { tasks, assignments } = splitAssignments(row.tasks);
+          setState({ tasks, milestones: row.milestones || {}, assignments });
         }
       )
       .subscribe();
@@ -79,7 +102,7 @@ function useProgress() {
     const { error } = await supabase
       .from("progress")
       .update({
-        tasks: next.tasks,
+        tasks: mergeAssignments(next.tasks, next.assignments),
         milestones: next.milestones,
         updated_at: new Date().toISOString(),
       })
@@ -98,9 +121,14 @@ function useProgress() {
     const cur = stateRef.current;
     push({ ...cur, milestones: { ...cur.milestones, [id]: !cur.milestones[id] } });
   };
-  const reset = () => push({ tasks: {}, milestones: {} });
+  const reassignTask = (id, newOwner) => {
+    const cur = stateRef.current;
+    if ((cur.assignments[id] || TASKS.find((t) => t.id === id)?.owner) === newOwner) return;
+    push({ ...cur, assignments: { ...cur.assignments, [id]: newOwner } });
+  };
+  const reset = () => push({ tasks: {}, milestones: {}, assignments: {} });
 
-  return { state, toggleTask, toggleMilestone, reset, status };
+  return { state, toggleTask, toggleMilestone, reassignTask, reset, status };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -270,7 +298,7 @@ function TaskRow({ task, done, onToggle }) {
 }
 
 // ─── Views ───────────────────────────────────────────────────
-function OverviewView({ state, stats, daysLeft }) {
+function OverviewView({ state, stats, daysLeft, tasks }) {
   return (
     <div className="fade-up">
       <div style={{
@@ -338,7 +366,7 @@ function OverviewView({ state, stats, daysLeft }) {
         </h2>
         <div style={{ display: "grid", gap: "22px" }}>
           {WEEKS.map((w) => {
-            const wTasks = TASKS.filter((t) => t.week === w.id);
+            const wTasks = tasks.filter((t) => t.week === w.id);
             const wDone = wTasks.filter((t) => state.tasks[t.id]).length;
             const wPct = pct(wDone, wTasks.length);
             return (
@@ -376,7 +404,7 @@ function OverviewView({ state, stats, daysLeft }) {
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "18px" }}>
           {Object.entries(OWNERS).map(([key, owner]) => {
-            const oTasks = TASKS.filter((t) => t.owner === key);
+            const oTasks = tasks.filter((t) => t.owner === key);
             if (!oTasks.length) return null;
             const oDone = oTasks.filter((t) => state.tasks[t.id]).length;
             const oPct = pct(oDone, oTasks.length);
@@ -403,11 +431,11 @@ function OverviewView({ state, stats, daysLeft }) {
   );
 }
 
-function WeeksView({ state, toggleTask }) {
+function WeeksView({ state, toggleTask, tasks }) {
   const [expanded, setExpanded] = useState(() => {
     // Auto-expand the first week that isn't fully complete
     for (const w of WEEKS) {
-      const wTasks = TASKS.filter((t) => t.week === w.id);
+      const wTasks = tasks.filter((t) => t.week === w.id);
       const wDone = wTasks.filter((t) => state.tasks[t.id]).length;
       if (wDone < wTasks.length) return w.id;
     }
@@ -417,7 +445,7 @@ function WeeksView({ state, toggleTask }) {
   return (
     <div className="fade-up" style={{ display: "grid", gap: "20px" }}>
       {WEEKS.map((w) => {
-        const wTasks = TASKS.filter((t) => t.week === w.id);
+        const wTasks = tasks.filter((t) => t.week === w.id);
         const wDone = wTasks.filter((t) => state.tasks[t.id]).length;
         const wPct = pct(wDone, wTasks.length);
         const isOpen = expanded === w.id;
@@ -548,10 +576,10 @@ function MilestonesView({ state, toggleMilestone }) {
   );
 }
 
-function OwnersView({ state, toggleTask }) {
+function OwnersView({ state, toggleTask, tasks }) {
   const [filter, setFilter] = useState("Nash");
   const owner = OWNERS[filter];
-  const ownerTasks = TASKS.filter((t) => t.owner === filter);
+  const ownerTasks = tasks.filter((t) => t.owner === filter);
   const done = ownerTasks.filter((t) => state.tasks[t.id]).length;
   const progress = pct(done, ownerTasks.length);
 
@@ -562,9 +590,9 @@ function OwnersView({ state, toggleTask }) {
         gap: "14px", marginBottom: "28px",
       }}>
         {Object.entries(OWNERS).map(([key, o]) => {
-          const total = TASKS.filter((t) => t.owner === key).length;
+          const total = tasks.filter((t) => t.owner === key).length;
           if (!total) return null;
-          const d = TASKS.filter((t) => t.owner === key && state.tasks[t.id]).length;
+          const d = tasks.filter((t) => t.owner === key && state.tasks[t.id]).length;
           const active = filter === key;
           return (
             <button
@@ -677,21 +705,204 @@ function OwnersView({ state, toggleTask }) {
   );
 }
 
+function ReassignView({ tasks, reassignTask }) {
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverOwner, setDragOverOwner] = useState(null);
+
+  const ownerKeys = Object.keys(OWNERS);
+  const grouped = ownerKeys.reduce((acc, k) => ((acc[k] = []), acc), {});
+  tasks.forEach((t) => {
+    (grouped[t.owner] || (grouped[t.owner] = [])).push(t);
+  });
+
+  const onDragStart = (e, taskId) => {
+    e.dataTransfer.setData("text/plain", taskId);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingId(taskId);
+  };
+  const onDragEnd = () => {
+    setDraggingId(null);
+    setDragOverOwner(null);
+  };
+  const onDragOver = (e, ownerKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverOwner !== ownerKey) setDragOverOwner(ownerKey);
+  };
+  const onDrop = (e, ownerKey) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData("text/plain");
+    if (taskId) reassignTask(taskId, ownerKey);
+    setDraggingId(null);
+    setDragOverOwner(null);
+  };
+
+  return (
+    <div className="fade-up">
+      <div style={{
+        background: C.glass, border: `1px solid ${C.glassBorder}`,
+        borderRadius: "22px", padding: "24px 28px", marginBottom: "22px",
+        backdropFilter: "blur(12px)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: "16px", flexWrap: "wrap",
+      }}>
+        <div>
+          <div style={{
+            fontSize: "12px", fontWeight: 800, color: C.accentLight,
+            textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "4px",
+          }}>◆ Drag to Reassign</div>
+          <h2 style={{ fontSize: "22px", fontWeight: 800, margin: 0, letterSpacing: "-0.4px" }}>
+            Move Tasks Between Founders
+          </h2>
+        </div>
+        <p style={{
+          fontSize: "13px", color: C.textMuted, margin: 0, maxWidth: "520px", lineHeight: 1.55,
+        }}>
+          Grab any task card and drop it onto a different founder's column. Changes sync live to the other two founders via Supabase, so everyone sees the updated workload immediately.
+        </p>
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+        gap: "18px",
+        alignItems: "start",
+      }}>
+        {ownerKeys.map((key) => {
+          const owner = OWNERS[key];
+          const colTasks = grouped[key] || [];
+          const isOver = dragOverOwner === key;
+          return (
+            <div
+              key={key}
+              onDragOver={(e) => onDragOver(e, key)}
+              onDragLeave={(e) => {
+                // Only clear when leaving the column entirely, not when hovering children
+                if (e.currentTarget.contains(e.relatedTarget)) return;
+                if (dragOverOwner === key) setDragOverOwner(null);
+              }}
+              onDrop={(e) => onDrop(e, key)}
+              style={{
+                background: isOver ? `${owner.color}18` : C.glass,
+                border: `2px ${isOver ? "dashed" : "solid"} ${isOver ? owner.color : C.glassBorder}`,
+                borderRadius: "20px",
+                padding: "22px",
+                backdropFilter: "blur(12px)",
+                minHeight: "340px",
+                transition: "background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
+                boxShadow: isOver ? `0 0 30px ${owner.color}33` : "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "6px" }}>
+                {owner.photo && (
+                  <img
+                    src={owner.photo}
+                    alt={owner.name}
+                    style={{
+                      width: "36px", height: "36px", borderRadius: "50%",
+                      objectFit: "cover", flexShrink: 0,
+                      border: `2px solid ${owner.color}`,
+                    }}
+                  />
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "15px", fontWeight: 800, color: owner.color, lineHeight: 1.1 }}>
+                    {owner.name}
+                  </div>
+                  <div style={{
+                    fontSize: "10px", color: C.textMuted, marginTop: "3px",
+                    textTransform: "uppercase", letterSpacing: "0.6px",
+                  }}>
+                    {owner.role}
+                  </div>
+                </div>
+              </div>
+              <div style={{
+                fontSize: "11px", fontWeight: 700, color: C.textDim,
+                textTransform: "uppercase", letterSpacing: "0.9px",
+                marginBottom: "14px",
+              }}>
+                {colTasks.length} {colTasks.length === 1 ? "task" : "tasks"}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {colTasks.map((t) => {
+                  const isDragging = draggingId === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      draggable
+                      onDragStart={(e) => onDragStart(e, t.id)}
+                      onDragEnd={onDragEnd}
+                      style={{
+                        padding: "11px 13px",
+                        borderRadius: "11px",
+                        background: "rgba(255,255,255,0.04)",
+                        border: `1px solid ${C.glassBorder}`,
+                        cursor: isDragging ? "grabbing" : "grab",
+                        opacity: isDragging ? 0.4 : 1,
+                        transform: isDragging ? "scale(0.98)" : "scale(1)",
+                        transition: "opacity 0.15s ease, transform 0.15s ease",
+                        userSelect: "none",
+                      }}
+                    >
+                      <div style={{
+                        fontSize: "10px", fontWeight: 800, color: owner.color,
+                        textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "3px",
+                      }}>
+                        Week {t.week}
+                      </div>
+                      <div style={{
+                        fontSize: "13px", fontWeight: 600, color: C.text, lineHeight: 1.4,
+                      }}>
+                        {t.title}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {colTasks.length === 0 && (
+                  <div style={{
+                    padding: "26px 12px",
+                    borderRadius: "11px",
+                    border: `1px dashed ${C.glassBorder}`,
+                    fontSize: "12px", color: C.textDim,
+                    textAlign: "center", fontStyle: "italic",
+                  }}>
+                    Drop tasks here
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main App ────────────────────────────────────────────────
 export default function App() {
-  const { state, toggleTask, toggleMilestone, reset, status } = useProgress();
+  const { state, toggleTask, toggleMilestone, reassignTask, reset, status } = useProgress();
   const [tab, setTab] = useState("overview");
 
+  // Apply reassignments over the static TASKS list so every view
+  // downstream sees the current owner, not the original one.
+  const effectiveTasks = useMemo(
+    () => TASKS.map((t) => ({ ...t, owner: state.assignments[t.id] || t.owner })),
+    [state.assignments]
+  );
+
   const stats = useMemo(() => {
-    const tasksTotal = TASKS.length;
-    const tasksDone = TASKS.filter((t) => state.tasks[t.id]).length;
+    const tasksTotal = effectiveTasks.length;
+    const tasksDone = effectiveTasks.filter((t) => state.tasks[t.id]).length;
     const msTotal = MILESTONES.length;
     const msDone = MILESTONES.filter((m) => state.milestones[m.id]).length;
     return {
       tasksTotal, tasksDone, taskPct: pct(tasksDone, tasksTotal),
       msTotal, msDone, msPct: pct(msDone, msTotal),
     };
-  }, [state]);
+  }, [effectiveTasks, state.tasks, state.milestones]);
 
   const daysLeft = daysUntil(LAUNCH_DATE);
 
@@ -700,6 +911,7 @@ export default function App() {
     { id: "weeks", label: "Weeks" },
     { id: "milestones", label: "Milestones" },
     { id: "owners", label: "Owners" },
+    { id: "reassign", label: "Reassign" },
   ];
 
   return (
@@ -798,10 +1010,11 @@ export default function App() {
         </div>
 
         {/* Content */}
-        {tab === "overview" && <OverviewView state={state} stats={stats} daysLeft={daysLeft} />}
-        {tab === "weeks" && <WeeksView state={state} toggleTask={toggleTask} />}
+        {tab === "overview" && <OverviewView state={state} stats={stats} daysLeft={daysLeft} tasks={effectiveTasks} />}
+        {tab === "weeks" && <WeeksView state={state} toggleTask={toggleTask} tasks={effectiveTasks} />}
         {tab === "milestones" && <MilestonesView state={state} toggleMilestone={toggleMilestone} />}
-        {tab === "owners" && <OwnersView state={state} toggleTask={toggleTask} />}
+        {tab === "owners" && <OwnersView state={state} toggleTask={toggleTask} tasks={effectiveTasks} />}
+        {tab === "reassign" && <ReassignView tasks={effectiveTasks} reassignTask={reassignTask} />}
 
         {/* Footer */}
         <div style={{
