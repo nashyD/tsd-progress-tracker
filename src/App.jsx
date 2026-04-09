@@ -483,11 +483,28 @@ function OwnersView({ state, toggleTask }) {
                 boxShadow: active ? `0 8px 30px ${o.color}22` : "none",
               }}
             >
-              <div style={{ fontSize: "15px", fontWeight: 800, color: active ? o.color : C.text, marginBottom: "4px" }}>
-                {o.name}
-              </div>
-              <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                {o.role}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+                {o.photo && (
+                  <img
+                    src={o.photo}
+                    alt={o.name}
+                    style={{
+                      width: "42px", height: "42px", borderRadius: "50%",
+                      objectFit: "cover", flexShrink: 0,
+                      border: `2px solid ${active ? o.color : "rgba(255,255,255,0.15)"}`,
+                      boxShadow: active ? `0 0 14px ${o.color}55` : "none",
+                      transition: "all 0.25s ease",
+                    }}
+                  />
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "15px", fontWeight: 800, color: active ? o.color : C.text }}>
+                    {o.name}
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    {o.role}
+                  </div>
+                </div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
                 <span style={{ color: C.textMuted }}>{d}/{total} tasks</span>
@@ -506,14 +523,28 @@ function OwnersView({ state, toggleTask }) {
         borderRadius: "22px", padding: "32px", backdropFilter: "blur(12px)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "22px", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <div style={{
-              fontSize: "11px", fontWeight: 800, color: owner.color,
-              textTransform: "uppercase", letterSpacing: "1.4px", marginBottom: "6px",
-            }}>◆ {owner.role}</div>
-            <h2 style={{ fontSize: "28px", fontWeight: 800, margin: 0, letterSpacing: "-0.5px" }}>
-              {owner.name}'s Tasks
-            </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+            {owner.photo && (
+              <img
+                src={owner.photo}
+                alt={owner.name}
+                style={{
+                  width: "72px", height: "72px", borderRadius: "50%",
+                  objectFit: "cover", flexShrink: 0,
+                  border: `3px solid ${owner.color}`,
+                  boxShadow: `0 0 22px ${owner.color}55`,
+                }}
+              />
+            )}
+            <div>
+              <div style={{
+                fontSize: "11px", fontWeight: 800, color: owner.color,
+                textTransform: "uppercase", letterSpacing: "1.4px", marginBottom: "6px",
+              }}>◆ {owner.role}</div>
+              <h2 style={{ fontSize: "28px", fontWeight: 800, margin: 0, letterSpacing: "-0.5px" }}>
+                {owner.name}'s Tasks
+              </h2>
+            </div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "32px", fontWeight: 800, color: C.text, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
