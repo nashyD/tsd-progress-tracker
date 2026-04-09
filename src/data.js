@@ -7,9 +7,9 @@ import grantPhoto from "./assets/grant.jpg";
 export const LAUNCH_DATE = "2026-05-01";
 
 export const OWNERS = {
-  Nash: { name: "Nash Davis", role: "CEO & Mod. Solutions Lead", color: "#7c5cfc" },
-  Bishop: { name: "Bishop Switzer", role: "COO & Detailing Lead", color: "#06d6a0", photo: bishopPhoto },
-  Grant: { name: "Grant Tadlock", role: "CFO & Sales Lead", color: "#f472b6", photo: grantPhoto },
+  Nash: { name: "Nash Davis", role: "CEO & Mod. Solutions Lead", color: "#7BAFD4" },
+  Bishop: { name: "Bishop Switzer", role: "COO & Detailing Lead", color: "#56B4E3", photo: bishopPhoto },
+  Grant: { name: "Grant Tadlock", role: "CFO & Sales Lead", color: "#9FCAE3", photo: grantPhoto },
   All: { name: "All Founders", role: "Shared responsibility", color: "#fbbf24" },
 };
 

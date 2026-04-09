@@ -3,23 +3,25 @@ import { TASKS, WEEKS, MILESTONES, OWNERS, LAUNCH_DATE } from "./data.js";
 import { supabase, TRACKER_ID } from "./supabase.js";
 
 // ─── Design Tokens ───────────────────────────────────────────
+// UNC Tar Heel Blue (Pantone 542) + Black brand palette.
 const C = {
-  bg: "#0a0a0f",
-  bgAlt: "#0e0e16",
-  glass: "rgba(255,255,255,0.05)",
-  glassBorder: "rgba(255,255,255,0.08)",
-  glassBorderStrong: "rgba(255,255,255,0.14)",
-  text: "#f0f0f5",
-  textMuted: "rgba(255,255,255,0.62)",
-  textDim: "rgba(255,255,255,0.38)",
-  accent: "#7c5cfc",
-  accentLight: "#a78bfa",
-  cyan: "#06d6a0",
-  pink: "#f472b6",
-  gold: "#fbbf24",
-  success: "#06d6a0",
-  gradientHero: "linear-gradient(135deg, #7c5cfc 0%, #a78bfa 40%, #06d6a0 100%)",
-  gradientCard: "linear-gradient(135deg, rgba(124,92,252,0.12), rgba(6,214,160,0.06))",
+  bg: "#000000",
+  bgAlt: "#060a12",
+  glass: "rgba(123,175,212,0.06)",
+  glassBorder: "rgba(123,175,212,0.18)",
+  glassBorderStrong: "rgba(123,175,212,0.32)",
+  text: "#f1f6fb",
+  textMuted: "rgba(241,246,251,0.62)",
+  textDim: "rgba(241,246,251,0.38)",
+  accent: "#7BAFD4",           // Carolina Blue
+  accentLight: "#9FCAE3",      // Lighter Carolina
+  cyan: "#56B4E3",             // Sky Blue — second blue for variety
+  navy: "#13294B",             // Carolina Navy — deep accent
+  gold: "#fbbf24",             // Warm accent for "Days to Launch" and "All founders"
+  danger: "#ef4444",           // Reds for error/destructive states only
+  success: "#7BAFD4",          // Done-state tint matches the brand accent
+  gradientHero: "linear-gradient(135deg, #7BAFD4 0%, #9FCAE3 40%, #56B4E3 100%)",
+  gradientCard: "linear-gradient(135deg, rgba(123,175,212,0.12), rgba(86,180,227,0.06))",
 };
 
 // ─── Persistence (Supabase + realtime) ──────────────────────
@@ -146,8 +148,8 @@ function GridBg() {
 function SyncBadge({ status }) {
   const config = {
     loading: { dot: C.gold, label: "Syncing…", bg: "rgba(251,191,36,0.1)", border: "rgba(251,191,36,0.3)" },
-    ready:   { dot: C.cyan, label: "Live",     bg: "rgba(6,214,160,0.1)",  border: "rgba(6,214,160,0.3)" },
-    error:   { dot: C.pink, label: "Offline",  bg: "rgba(244,114,182,0.1)", border: "rgba(244,114,182,0.3)" },
+    ready:   { dot: C.cyan, label: "Live",     bg: "rgba(123,175,212,0.1)",  border: "rgba(123,175,212,0.3)" },
+    error:   { dot: C.danger, label: "Offline", bg: "rgba(239,68,68,0.1)",  border: "rgba(239,68,68,0.3)" },
   }[status] || { dot: C.textDim, label: "—", bg: "rgba(255,255,255,0.04)", border: C.glassBorder };
   return (
     <div style={{
@@ -219,8 +221,8 @@ function TaskRow({ task, done, onToggle }) {
     <label style={{
       display: "flex", alignItems: "flex-start", gap: "14px",
       padding: "14px 16px", borderRadius: "12px",
-      background: done ? "rgba(6,214,160,0.06)" : "transparent",
-      border: `1px solid ${done ? "rgba(6,214,160,0.2)" : "rgba(255,255,255,0.05)"}`,
+      background: done ? "rgba(123,175,212,0.08)" : "transparent",
+      border: `1px solid ${done ? "rgba(123,175,212,0.25)" : "rgba(255,255,255,0.05)"}`,
       cursor: "pointer", transition: "all 0.2s ease",
       marginBottom: "8px",
     }}
@@ -240,7 +242,7 @@ function TaskRow({ task, done, onToggle }) {
         transition: "all 0.2s ease",
       }}>
         {done && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0f" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         )}
@@ -277,7 +279,20 @@ function OverviewView({ state, stats, daysLeft }) {
       }}>
         <StatCard
           label="Days to Launch"
-          value={daysLeft > 0 ? daysLeft : daysLeft === 0 ? "🚀" : "LIVE"}
+          value={
+            daysLeft > 0
+              ? daysLeft
+              : daysLeft === 0
+              ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "10px", color: C.gold }}>
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+                  </svg>
+                  GO
+                </span>
+              )
+              : "LIVE"
+          }
           sub={daysLeft > 0 ? `until ${new Date(LAUNCH_DATE + "T00:00:00").toLocaleDateString(undefined, { month: "long", day: "numeric" })}` : "Launch day!"}
           accent={C.gold}
         />
@@ -305,7 +320,7 @@ function OverviewView({ state, stats, daysLeft }) {
           label="Founders"
           value="3"
           sub="Nash · Bishop · Grant"
-          accent={C.pink}
+          accent={C.accentLight}
         />
       </div>
 
@@ -488,8 +503,8 @@ function MilestonesView({ state, toggleMilestone }) {
               style={{
                 display: "flex", alignItems: "center", gap: "18px",
                 width: "100%", padding: "14px 18px",
-                background: hit ? "rgba(6,214,160,0.08)" : "rgba(255,255,255,0.02)",
-                border: `1px solid ${hit ? "rgba(6,214,160,0.3)" : "rgba(255,255,255,0.06)"}`,
+                background: hit ? "rgba(123,175,212,0.1)" : "rgba(255,255,255,0.02)",
+                border: `1px solid ${hit ? "rgba(123,175,212,0.3)" : "rgba(255,255,255,0.06)"}`,
                 borderRadius: "14px", marginBottom: "12px",
                 textAlign: "left", transition: "all 0.25s ease",
                 position: "relative",
@@ -511,7 +526,7 @@ function MilestonesView({ state, toggleMilestone }) {
                 transition: "all 0.3s ease",
               }}>
                 {hit && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0f" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 )}
@@ -695,11 +710,19 @@ export default function App() {
         <div style={{ marginBottom: "40px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "20px" }}>
             <div>
+              <img
+                src="/tsd-ms-logo-tarheel.svg"
+                alt="TSD Incorporated"
+                style={{
+                  height: "72px", width: "auto", display: "block", marginBottom: "18px",
+                  filter: `drop-shadow(0 0 30px rgba(123,175,212,0.45)) drop-shadow(0 0 60px rgba(123,175,212,0.2))`,
+                }}
+              />
               <div style={{
                 fontSize: "12px", fontWeight: 800, color: C.accentLight,
                 textTransform: "uppercase", letterSpacing: "2px", marginBottom: "10px",
               }}>
-                ◆ TSD Incorporated · Internal Tracker
+                ◆ Internal Sprint Tracker
               </div>
               <h1 style={{
                 fontSize: "clamp(36px, 5vw, 52px)", fontWeight: 900,
@@ -732,9 +755,9 @@ export default function App() {
                 transition: "all 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(244,114,182,0.12)";
-                e.currentTarget.style.color = C.pink;
-                e.currentTarget.style.borderColor = "rgba(244,114,182,0.3)";
+                e.currentTarget.style.background = "rgba(239,68,68,0.12)";
+                e.currentTarget.style.color = C.danger;
+                e.currentTarget.style.borderColor = "rgba(239,68,68,0.3)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "rgba(255,255,255,0.04)";

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="p1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9FCAE3"/>
+      <stop offset="100%" stop-color="#7BAFD4"/>
+    </linearGradient>
+    <linearGradient id="p2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7BAFD4"/>
+      <stop offset="100%" stop-color="#4A90BF"/>
+    </linearGradient>
+    <linearGradient id="p3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#13294B"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark rounded backdrop so the icon reads on light and dark browser chrome -->
+  <rect width="64" height="64" rx="12" fill="#05080f"/>
+
+  <!-- Three parallelogram "prisms", overlapping, mirroring the hero logo -->
+  <path d="M9 18 L31 18 L25 46 L3 46 Z" fill="url(#p1)"/>
+  <path d="M23 18 L45 18 L39 46 L17 46 Z" fill="url(#p2)"/>
+  <path d="M37 18 L59 18 L53 46 L31 46 Z" fill="url(#p3)"/>
+
+  <!-- Subtle top-edge highlights -->
+  <path d="M9 18 L31 18" stroke="#ffffff" stroke-opacity="0.24" stroke-width="0.5" fill="none"/>
+  <path d="M23 18 L45 18" stroke="#ffffff" stroke-opacity="0.28" stroke-width="0.5" fill="none"/>
+  <path d="M37 18 L59 18" stroke="#ffffff" stroke-opacity="0.34" stroke-width="0.5" fill="none"/>
+
+  <!-- T S D letters, one per prism's visible area -->
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-weight="700" fill="#ffffff" text-anchor="middle">
+    <text x="16" y="37" font-size="13">T</text>
+    <text x="30" y="37" font-size="13">S</text>
+    <text x="45" y="37" font-size="13">D</text>
+  </g>
+</svg>

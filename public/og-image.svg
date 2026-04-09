@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="p1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9FCAE3"/>
+      <stop offset="100%" stop-color="#7BAFD4"/>
+    </linearGradient>
+    <linearGradient id="p2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7BAFD4"/>
+      <stop offset="100%" stop-color="#4A90BF"/>
+    </linearGradient>
+    <linearGradient id="p3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#13294B"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#7BAFD4" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#ffffff" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#000000"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- TSD prisms, centered large on the canvas. Base design from 720×320 logo scaled ×2.2.
+       Source prisms: x=190..530 (w=340), y=40..200 (h=160).
+       Scaled w=748 h=352, centered → Tx = (1200-748)/2 - 190*2.2 = -192,  Ty = (630-352)/2 - 40*2.2 = 51 -->
+  <g transform="translate(-192, 51) scale(2.2)">
+    <!-- T -->
+    <path d="M230 40 L350 40 L310 200 L190 200 Z" fill="url(#p1)"/>
+    <!-- S -->
+    <path d="M320 40 L440 40 L400 200 L280 200 Z" fill="url(#p2)"/>
+    <!-- D -->
+    <path d="M410 40 L530 40 L490 200 L370 200 Z" fill="url(#p3)"/>
+    <!-- Top-edge highlights -->
+    <path d="M230 40 L350 40" stroke="#ffffff" stroke-opacity="0.24" stroke-width="1" fill="none"/>
+    <path d="M320 40 L440 40" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1" fill="none"/>
+    <path d="M410 40 L530 40" stroke="#ffffff" stroke-opacity="0.34" stroke-width="1" fill="none"/>
+    <!-- Letters -->
+    <g font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-weight="700" fill="#ffffff" text-anchor="middle">
+      <text x="270" y="138" font-size="56">T</text>
+      <text x="360" y="138" font-size="56">S</text>
+      <text x="450" y="138" font-size="56">D</text>
+    </g>
+  </g>
+</svg>
