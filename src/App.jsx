@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TASKS, WEEKS, MILESTONES, OWNERS, LAUNCH_DATE } from "./data.js";
+import { supabase, TRACKER_ID } from "./supabase.js";
 
 // ─── Design Tokens ───────────────────────────────────────────
 const C = {
@@ -21,27 +22,83 @@ const C = {
   gradientCard: "linear-gradient(135deg, rgba(124,92,252,0.12), rgba(6,214,160,0.06))",
 };
 
-const STORAGE_KEY = "tsd-launch-tracker-v1";
-
-// ─── Persistence ─────────────────────────────────────────────
+// ─── Persistence (Supabase + realtime) ──────────────────────
+// Single shared row `tsd-launch` in the `progress` table. Every
+// check-off writes to Supabase; all connected clients receive the
+// update via postgres_changes subscription and re-render instantly.
 function useProgress() {
-  const [state, setState] = useState(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return { tasks: {}, milestones: {} };
-  });
+  const [state, setState] = useState({ tasks: {}, milestones: {} });
+  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
+  // Initial load + realtime subscription
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-  }, [state]);
+    let mounted = true;
 
-  const toggleTask = (id) => setState((s) => ({ ...s, tasks: { ...s.tasks, [id]: !s.tasks[id] } }));
-  const toggleMilestone = (id) => setState((s) => ({ ...s, milestones: { ...s.milestones, [id]: !s.milestones[id] } }));
-  const reset = () => setState({ tasks: {}, milestones: {} });
+    supabase
+      .from("progress")
+      .select("tasks, milestones")
+      .eq("id", TRACKER_ID)
+      .single()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          console.error("Supabase load failed:", error);
+          setStatus("error");
+          return;
+        }
+        setState({ tasks: data.tasks || {}, milestones: data.milestones || {} });
+        setStatus("ready");
+      });
 
-  return { state, toggleTask, toggleMilestone, reset };
+    const channel = supabase
+      .channel("progress-sync")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "progress", filter: `id=eq.${TRACKER_ID}` },
+        (payload) => {
+          if (!mounted) return;
+          const row = payload.new;
+          setState({ tasks: row.tasks || {}, milestones: row.milestones || {} });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Optimistic write helper
+  const push = async (next) => {
+    setState(next);
+    const { error } = await supabase
+      .from("progress")
+      .update({
+        tasks: next.tasks,
+        milestones: next.milestones,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", TRACKER_ID);
+    if (error) {
+      console.error("Supabase save failed:", error);
+      setStatus("error");
+    }
+  };
+
+  const toggleTask = (id) => {
+    const cur = stateRef.current;
+    push({ ...cur, tasks: { ...cur.tasks, [id]: !cur.tasks[id] } });
+  };
+  const toggleMilestone = (id) => {
+    const cur = stateRef.current;
+    push({ ...cur, milestones: { ...cur.milestones, [id]: !cur.milestones[id] } });
+  };
+  const reset = () => push({ tasks: {}, milestones: {} });
+
+  return { state, toggleTask, toggleMilestone, reset, status };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -82,6 +139,31 @@ function GridBg() {
         background: `radial-gradient(circle, ${C.cyan}, transparent)`,
         bottom: "-15%", left: "-8%", animation: "orbFloat2 18s ease-in-out infinite 3s",
       }} />
+    </div>
+  );
+}
+
+function SyncBadge({ status }) {
+  const config = {
+    loading: { dot: C.gold, label: "Syncing…", bg: "rgba(251,191,36,0.1)", border: "rgba(251,191,36,0.3)" },
+    ready:   { dot: C.cyan, label: "Live",     bg: "rgba(6,214,160,0.1)",  border: "rgba(6,214,160,0.3)" },
+    error:   { dot: C.pink, label: "Offline",  bg: "rgba(244,114,182,0.1)", border: "rgba(244,114,182,0.3)" },
+  }[status] || { dot: C.textDim, label: "—", bg: "rgba(255,255,255,0.04)", border: C.glassBorder };
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: "8px",
+      padding: "8px 14px", borderRadius: "999px",
+      background: config.bg, border: `1px solid ${config.border}`,
+      fontSize: "11px", fontWeight: 700, color: config.dot,
+      textTransform: "uppercase", letterSpacing: "0.8px",
+    }}>
+      <span style={{
+        width: "8px", height: "8px", borderRadius: "50%",
+        background: config.dot,
+        boxShadow: status === "ready" ? `0 0 8px ${config.dot}` : "none",
+        animation: status === "loading" ? "pulse 1.4s ease-in-out infinite" : "none",
+      }} />
+      {config.label}
     </div>
   );
 }
@@ -582,7 +664,7 @@ function OwnersView({ state, toggleTask }) {
 
 // ─── Main App ────────────────────────────────────────────────
 export default function App() {
-  const { state, toggleTask, toggleMilestone, reset } = useProgress();
+  const { state, toggleTask, toggleMilestone, reset, status } = useProgress();
   const [tab, setTab] = useState("overview");
 
   const stats = useMemo(() => {
@@ -635,9 +717,11 @@ export default function App() {
                 Apr 6 – Apr 30, 2026 · 4 sprint weeks, 32 tasks, 8 milestones · Charlotte Metro Area
               </p>
             </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <SyncBadge status={status} />
             <button
               onClick={() => {
-                if (confirm("Reset all progress? This clears every checked task and milestone.")) reset();
+                if (confirm("Reset all progress for everyone? This clears every checked task and milestone across all 3 founders' views.")) reset();
               }}
               style={{
                 padding: "10px 18px", borderRadius: "10px",
@@ -660,6 +744,7 @@ export default function App() {
             >
               Reset Progress
             </button>
+            </div>
           </div>
         </div>
 
@@ -701,7 +786,7 @@ export default function App() {
           borderTop: `1px solid ${C.glassBorder}`,
           fontSize: "12px", color: C.textDim, textAlign: "center",
         }}>
-          Launch hard. Learn fast. Build something real. · Progress saved to this browser.
+          Launch hard. Learn fast. Build something real. · Live-synced across all 3 founders via Supabase.
         </div>
       </div>
     </div>
