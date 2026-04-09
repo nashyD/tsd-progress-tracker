@@ -2,13 +2,14 @@
 // Pulled from TSD_Launch_Preparation_Plan.pptx (Apr 6–Apr 30, 2026).
 
 import bishopPhoto from "./assets/bishop.jpg";
+import grantPhoto from "./assets/grant.jpg";
 
 export const LAUNCH_DATE = "2026-05-01";
 
 export const OWNERS = {
   Nash: { name: "Nash Davis", role: "CEO & Mod. Solutions Lead", color: "#7c5cfc" },
   Bishop: { name: "Bishop Switzer", role: "COO & Detailing Lead", color: "#06d6a0", photo: bishopPhoto },
-  Grant: { name: "Grant Tadlock", role: "CFO & Sales Lead", color: "#f472b6" },
+  Grant: { name: "Grant Tadlock", role: "CFO & Sales Lead", color: "#f472b6", photo: grantPhoto },
   All: { name: "All Founders", role: "Shared responsibility", color: "#fbbf24" },
 };
 
